@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cc-service-search.fullname" . }}-cc-service-search
+  labels:
+    run: cc-service-search
+  {{- include "cc-service-search.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.ccServiceSearch.type }}
+  selector:
+    run: cc-service-search
+  {{- include "cc-service-search.selectorLabels" . | nindent 4 }}
+  ports:
+	{{- .Values.ccServiceSearch.ports | toYaml | nindent 2 }}

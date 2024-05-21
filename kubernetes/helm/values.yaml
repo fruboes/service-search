@@ -1,0 +1,25 @@
+ccServiceSearch:
+  #admin_db_password: TODO
+  db_index: cc_service_database
+  db_user: ccsearch
+  #db_password: TODO
+  db_host: opensearch-cluster-master-headless
+  hostname: ccsearch.com
+  allowed_languages: "pl,en"
+  ports:
+  - port: 8000
+    protocol: TCP
+    targetPort: 8000
+  type: NodePort
+kubernetesClusterDomain: cluster.local
+
+opensearch:
+  sysctlInit:
+    enabled: True
+  replicas: 1
+  service:
+    type: NodePort
+    nodePort: 32123
+  envFrom:
+   - secretRef:
+       name: opensearch-initial-admin-pass

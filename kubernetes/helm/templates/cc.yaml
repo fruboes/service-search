@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "cc-service-search.fullname" . }}-cc-service-search
+  labels:
+    run: cc-service-search
+  {{- include "cc-service-search.labels" . | nindent 4 }}
+spec:
+  initContainers:
+  - name: wait-for-opensearch
+    image: localhost:5000/cc-service-search:v{{ .Chart.AppVersion }}
+    args:
+      - /bin/sh
+      - -c
+      - curl -XGET -k --retry 8 --retry-delay 10 --connect-timeout 5 "https://{{ .Values.ccServiceSearch.db_host }}:9200/_cluster/health?wait_for_status=green&timeout=120s"
+  - name: setup-opensearch-accounts
+    image: localhost:5000/cc-service-search:v{{ .Chart.AppVersion }}
+    env:
+    - name: DB_USER
+      valueFrom:
+        secretKeyRef:
+          name: ccsearch-dbaccess
+          key: db_user
+    - name: DB_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: ccsearch-dbaccess
+          key: db_password
+    - name: ADMIN_DB_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: ccsearch-dbaccess-admin
+          key: admin_db_password
+    args:
+      - /bin/sh
+      - -c 
+      - |
+          echo;
+          curl -XPUT https://{{ .Values.ccServiceSearch.db_host }}:9200/_plugins/_security/api/roles/{{ .Values.ccServiceSearch.db_user }}ro -u admin:$ADMIN_DB_PASSWORD -k -H 'Content-Type: application/json' -d '
+          {
+            "cluster_permissions": [ ],
+            "index_permissions": [{
+              "index_patterns": [
+                "{{ .Values.ccServiceSearch.db_index }}"
+              ],
+              "dls": "",
+              "fls": [],
+              "masked_fields": [],
+              "allowed_actions": [
+                  "indices:data/read/*"
+              ]
+            }],
+            "tenant_permissions": [{
+              "tenant_patterns": [
+              ],
+              "allowed_actions": [
+              ]
+            }]
+          }';
+          echo;
+          curl -XPUT https://{{ .Values.ccServiceSearch.db_host }}:9200/_plugins/_security/api/internalusers/{{ .Values.ccServiceSearch.db_user }} -u admin:$ADMIN_DB_PASSWORD -k -H 'Content-Type: application/json' -d '
+          {
+            "password": "'$DB_PASSWORD'",
+            "opendistro_security_roles": ["{{ .Values.ccServiceSearch.db_user }}ro"]
+          }';
+          echo;
+  containers:
+  - env:
+    - name: DB_HOST
+      value: {{ .Values.ccServiceSearch.db_host }}
+    - name: DB_PORT
+      value: "9200"
+    - name: DB_USER
+      valueFrom:
+        secretKeyRef:
+          name: ccsearch-dbaccess
+          key: db_user
+    - name: DB_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: ccsearch-dbaccess
+          key: db_password
+    - name: DB_ALLOWED_LANGUAGES
+      value: {{ .Values.ccServiceSearch.allowed_languages }}
+    - name: DB_INDEX
+      value: {{ .Values.ccServiceSearch.db_index }}
+    image: localhost:5000/cc-service-search:v{{ .Chart.AppVersion }}
+    name: cc-service-search
+    ports:
+    - containerPort: 8000
+    resources: {}
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+
+    
